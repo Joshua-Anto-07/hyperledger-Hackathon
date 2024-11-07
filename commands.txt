@@ -1,0 +1,17 @@
+const Event = artifacts.require("Event");
+const eventInstance = await Event.deployed();
+
+
+// Define parameters
+const eventName = "match1";
+const futureDate = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+const ticketPrice = web3.utils.toWei("0.5", "ether"); // 0.5 ETH in wei
+const totalTickets = 20;
+
+// Add event
+await eventInstance.addEvent(eventName, futureDate, ticketPrice, totalTickets, { from: accounts[0] });
+
+// Verify the event
+const event = await eventInstance.viewEvent(0);
+console.log(event);
+
