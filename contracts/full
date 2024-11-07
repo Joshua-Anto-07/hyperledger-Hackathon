@@ -1,0 +1,160 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Event {
+    struct Event {
+        uint eventId;
+        string name;
+        uint date;
+        uint ticketPrice;
+        uint totalTickets;
+        uint ticketsSold;
+        address payable organizer;
+    }
+
+    struct Ticket {
+        uint ticketId;
+        string eventName;
+        uint seatNumber;
+    }
+
+    struct User {
+        address userAddress;
+        string name;
+        string email;
+        string dob;
+        string gender;
+        uint[] ticketIds;
+    }
+
+    mapping(uint => Event) public events;
+    mapping(uint => Ticket) public tickets;
+    mapping(address => User) public users;
+    uint public nextEventId;
+    uint public nextTicketId;
+
+    event EventAdded(
+        uint eventId,
+        string name,
+        uint date,
+        uint ticketPrice,
+        uint totalTickets,
+        address organizer
+    );
+
+    event TicketPurchased(
+        uint ticketId,
+        string eventName,
+        uint seatNumber,
+        address purchaser
+    );
+
+    event UserAdded(
+        address userAddress,
+        string name,
+        string email,
+        string dob,
+        string gender
+    );
+
+    function addEvent(
+        string memory _name,
+        uint _date,
+        uint _ticketPrice,
+        uint _totalTickets
+    ) public {
+        require(_date > block.timestamp, "Event date must be in the future");
+        require(_ticketPrice > 0, "Ticket price must be greater than zero");
+        require(_totalTickets > 0, "Total tickets must be greater than zero");
+
+        uint newEventId = generateEventId();
+
+        Event memory newEvent = Event({
+            eventId: newEventId,
+            name: _name,
+            date: _date,
+            ticketPrice: _ticketPrice,
+            totalTickets: _totalTickets,
+            ticketsSold: 0,
+            organizer: payable(msg.sender)
+        });
+
+        events[newEventId] = newEvent;
+        emit EventAdded(newEventId, _name, _date, _ticketPrice, _totalTickets, msg.sender);
+    }
+
+    function generateEventId() internal returns (uint) {
+        return nextEventId++;
+    }
+
+    function viewEvent(uint _eventId) public view returns (Event memory) {
+        require(events[_eventId].eventId == _eventId, "Event does not exist");
+        return events[_eventId];
+    }
+
+    function viewAllEvents() public view returns (Event[] memory) {
+        Event[] memory allEvents = new Event[](nextEventId);
+        for (uint i = 0; i < nextEventId; i++) {
+            allEvents[i] = events[i];
+        }
+        return allEvents;
+    }
+
+    function addUser(string memory _name, string memory _email, string memory _dob, string memory _gender) public {
+        require(users[msg.sender].userAddress == address(0), "User already exists");
+
+        users[msg.sender] = User({
+            userAddress: msg.sender,
+            name: _name,
+            email: _email,
+            dob: _dob,
+            gender: _gender,
+            ticketIds: new uint [](0)
+        });
+
+        emit UserAdded(msg.sender, _name, _email, _dob, _gender);
+    }
+
+    function purchaseTicket(uint _eventId, uint _seatNumber) public payable {
+        require(events[_eventId].eventId == _eventId, "Event does not exist");
+        require(events[_eventId].ticketsSold < events[_eventId].totalTickets, "All tickets sold out");
+        require(msg.value == events[_eventId].ticketPrice, "Incorrect ticket price");
+        require(users[msg.sender].userAddress != address(0), "User does not exist");
+
+        uint newTicketId = generateTicketId();
+
+        Ticket memory newTicket = Ticket({
+            ticketId: newTicketId,
+            eventName: events[_eventId].name,
+            seatNumber: _seatNumber
+        });
+
+        tickets[newTicketId] = newTicket;
+        users[msg.sender].ticketIds.push(newTicketId);
+        events[_eventId].ticketsSold++;
+
+        events[_eventId].organizer.transfer(msg.value);
+
+        emit TicketPurchased(newTicketId, events[_eventId].name, _seatNumber, msg.sender);
+    }
+
+    function generateTicketId() internal returns (uint) {
+        return nextTicketId++;
+    }
+
+    function viewTicket(uint _ticketId) public view returns (Ticket memory) {
+        require(tickets[_ticketId].ticketId == _ticketId, "Ticket does not exist");
+        return tickets[_ticketId];
+    }
+
+    function viewUserTickets(address _userAddress) public view returns (Ticket[] memory) {
+        require(users[_userAddress].userAddress != address(0), "User does not exist");
+        uint[] storage ticketIds = users[_userAddress].ticketIds;
+        Ticket[] memory userTickets = new Ticket[](ticketIds.length);
+        for (uint i = 0; i < ticketIds.length; i++) {
+            userTickets[i] = tickets[ticketIds[i]];
+        }
+        return userTickets;
+    }
+}
+
